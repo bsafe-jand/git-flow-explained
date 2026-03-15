@@ -1,4 +1,2 @@
-# Ignore all content inside example/ (it has its own git repo)
-# but keep the folder itself via .gitkeep
-example/*
-!example/.gitkeep
+# example/ has its own git repo — ignore it entirely from the root
+example/
