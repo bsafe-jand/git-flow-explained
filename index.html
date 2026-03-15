@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Git Flow – A Development Workflow Overview</title>
+  <style>
+    /* ── Reset & Base ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #21262d;
+      --border:    #30363d;
+      --accent:    #f78166;
+      --green:     #3fb950;
+      --blue:      #58a6ff;
+      --purple:    #bc8cff;
+      --yellow:    #e3b341;
+      --orange:    #ffa657;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --font:      'Segoe UI', system-ui, sans-serif;
+      --mono:      'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ── Slide Container ────────────────────────────────────────────── */
+    #deck {
+      width: 100vw; height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 80px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.45s ease;
+      text-align: center;
+    }
+    .slide.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ── Typography ─────────────────────────────────────────────────── */
+    h1 { font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 700; line-height: 1.1; }
+    h2 { font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.35rem; }
+    p  { font-size: clamp(0.95rem, 1.5vw, 1.15rem); color: var(--muted); line-height: 1.7; max-width: 820px; }
+    .accent  { color: var(--accent); }
+    .green   { color: var(--green); }
+    .blue    { color: var(--blue); }
+    .purple  { color: var(--purple); }
+    .yellow  { color: var(--yellow); }
+    .orange  { color: var(--orange); }
+    .muted   { color: var(--muted); }
+    .tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── Layout Helpers ─────────────────────────────────────────────── */
+    .cols    { display: flex; gap: 28px; width: 100%; max-width: 1100px; }
+    .col     { flex: 1; text-align: left; }
+    .spacer  { height: 24px; }
+    .spacer-sm { height: 12px; }
+
+    /* ── Card ───────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      text-align: left;
+    }
+    .card-list { list-style: none; }
+    .card-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+      color: var(--text);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .card-list li:last-child { border-bottom: none; }
+    .card-list li span.icon { flex-shrink: 0; }
+
+    /* ── Code Block ─────────────────────────────────────────────────── */
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-family: var(--mono);
+      font-size: clamp(0.8rem, 1.2vw, 0.95rem);
+      text-align: left;
+      overflow-x: auto;
+      line-height: 1.7;
+      width: 100%;
+    }
+    .cmd-comment { color: var(--muted); }
+    .cmd-key     { color: var(--blue); }
+    .cmd-val     { color: var(--green); }
+    .cmd-branch  { color: var(--purple); }
+    .cmd-flag    { color: var(--yellow); }
+
+    /* ── Branch Diagram ─────────────────────────────────────────────── */
+    .diagram-wrap {
+      width: 100%;
+      max-width: 900px;
+      overflow-x: auto;
+    }
+
+    /* ── Pill badges ────────────────────────────────────────────────── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      margin: 5px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* ── Navigation ─────────────────────────────────────────────────── */
+    #nav {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 100;
+    }
+    #nav button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 20px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    #nav button:hover { background: var(--surface2); border-color: var(--muted); }
+    #nav button:disabled { opacity: 0.3; cursor: default; }
+    #counter {
+      font-size: 0.82rem;
+      color: var(--muted);
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* ── Progress bar ───────────────────────────────────────────────── */
+    #progress-bar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--purple));
+      transition: width 0.4s ease;
+      z-index: 200;
+    }
+
+    /* ── Slide-specific: Title ──────────────────────────────────────── */
+    .slide-title {
+      background: radial-gradient(ellipse at 60% 40%, #1a1033 0%, var(--bg) 70%);
+    }
+    .slide-title h1 { margin-bottom: 1rem; }
+    .slide-title .subtitle {
+      font-size: clamp(1rem, 1.8vw, 1.3rem);
+      color: var(--muted);
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 2rem;
+    }
+    .git-icon {
+      width: 56px; height: 56px;
+      fill: var(--orange);
+    }
+
+    /* ── Diagram SVG ────────────────────────────────────────────────── */
+    .branch-svg {
+      width: 100%;
+      max-width: 880px;
+      height: auto;
+    }
+
+    /* ── Benefit grid ───────────────────────────────────────────────── */
+    .benefit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+      max-width: 860px;
+    }
+    .benefit-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      text-align: left;
+    }
+    .benefit-item .icon { font-size: 1.6rem; margin-bottom: 8px; }
+    .benefit-item h3 { font-size: 1rem; margin-bottom: 4px; }
+    .benefit-item p { font-size: 0.88rem; }
+
+    /* slide-specific accent borders */
+    #s2 { border-top: 3px solid var(--green); }
+    #s3 { border-top: 3px solid var(--blue); }
+
+    /* Keyboard hint */
+    .keyboard-hint {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      z-index: 100;
+    }
+    .key {
+      display: inline-block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 0.7rem;
+    }
+  </style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<div class="keyboard-hint">
+  Navigate: <span class="key">←</span> <span class="key">→</span> or <span class="key">Space</span>
+</div>
+
+<div id="deck">
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 1 · Title                                                 -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide slide-title active" id="s1">
+    <div class="logo-row">
+      <svg class="git-icon" viewBox="0 0 92 92" xmlns="http://www.w3.org/2000/svg">
+        <path d="M90.156 41.965 50.036 1.848a5.913 5.913 0 0 0-8.368 0l-8.332 8.332 10.566 10.566a7.03 7.03 0 0 1 7.23 1.684 7.043 7.043 0 0 1 1.673 7.277l10.183 10.184a7.026 7.026 0 0 1 7.278 1.672 7.04 7.04 0 0 1 0 9.951 7.048 7.048 0 0 1-9.954 0 7.053 7.053 0 0 1-1.52-7.7L49.276 32.71v27.31a7.05 7.05 0 0 1 1.87 11.202 7.04 7.04 0 0 1-9.954 0 7.04 7.04 0 0 1 0-9.951 7.064 7.064 0 0 1 2.303-1.538V32.34a7.049 7.049 0 0 1-3.82-9.234L29.242 12.557 1.844 39.955a5.918 5.918 0 0 0 0 8.371L41.968 90.15a5.917 5.917 0 0 0 8.368 0l39.82-39.816a5.92 5.92 0 0 0 0-8.37"/>
+      </svg>
+      <div style="text-align:left">
+        <div style="font-size:0.8rem;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:2px;">Development Workflow</div>
+        <h1>Git <span class="accent">Flow</span></h1>
+      </div>
+    </div>
+    <p class="subtitle">A structured branching model for teams — covering the core concepts,<br>branch types, commands, and best practices.</p>
+    <div class="spacer"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+      <span class="pill"><span class="dot" style="background:var(--green)"></span>main</span>
+      <span class="pill"><span class="dot" style="background:var(--blue)"></span>develop</span>
+      <span class="pill"><span class="dot" style="background:var(--purple)"></span>feature/*</span>
+      <span class="pill"><span class="dot" style="background:var(--yellow)"></span>release/*</span>
+      <span class="pill"><span class="dot" style="background:var(--accent)"></span>hotfix/*</span>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 2 · What is Git Flow?                                     -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s2">
+    <h2>What is <span class="green">Git Flow</span>?</h2>
+    <div class="spacer-sm"></div>
+    <p>Git Flow is a <strong>branching model</strong> introduced by Vincent Driessen in 2010.<br>
+    It defines a strict branching structure designed around project releases, giving development teams a robust framework for managing features, releases, and bug fixes.</p>
+    <div class="spacer"></div>
+    <div class="cols" style="max-width:860px;">
+      <div class="card col">
+        <h3 class="green" style="margin-bottom:12px;">Core idea</h3>
+        <ul class="card-list">
+          <li><span class="icon">🌿</span>Two long-lived branches: <strong>main</strong> &amp; <strong>develop</strong></li>
+          <li><span class="icon">🔀</span>Short-lived support branches for work-in-progress</li>
+          <li><span class="icon">🔒</span><strong>main</strong> only ever holds production-ready code</li>
+          <li><span class="icon">🚀</span>Releases are isolated, tested, and tagged</li>
+        </ul>
+      </div>
+      <div class="card col">
+        <h3 class="blue" style="margin-bottom:12px;">When to use it</h3>
+        <ul class="card-list">
+          <li><span class="icon">📦</span>Versioned / scheduled releases</li>
+          <li><span class="icon">👥</span>Teams with multiple parallel features</li>
+          <li><span class="icon">🛡️</span>Projects needing strict production stability</li>
+          <li><span class="icon">🏗️</span>Long-running support of older versions</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 3 · The Branch Map                                        -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s3">
+    <h2>The <span class="blue">Branch Map</span></h2>
+    <div class="spacer-sm"></div>
+    <div class="diagram-wrap">
+      <svg class="branch-svg" viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+        <!-- Grid lines -->
+        <line x1="0" y1="40"  x2="880" y2="40"  stroke="#21262d" stroke-width="1"/>
+        <line x1="0" y1="100" x2="880" y2="100" stroke="#21262d" stroke-width="1"/>
+        <line x1="0" y1="160" x2="880" y2="160" stroke="#21262d" stroke-width="1"/>
+        <line x1="0" y1="220" x2="880" y2="220" stroke="#21262d" stroke-width="1"/>
+        <line x1="0" y1="280" x2="880" y2="280" stroke="#21262d" stroke-width="1"/>
+
+        <!-- Labels -->
+        <text x="10" y="45"  fill="#3fb950" font-size="12" font-weight="600">main</text>
+        <text x="10" y="105" fill="#58a6ff" font-size="12" font-weight="600">develop</text>
+        <text x="10" y="165" fill="#bc8cff" font-size="12" font-weight="600">feature</text>
+        <text x="10" y="225" fill="#e3b341" font-size="12" font-weight="600">release</text>
+        <text x="10" y="285" fill="#f78166" font-size="12" font-weight="600">hotfix</text>
+
+        <!-- MAIN line -->
+        <line x1="80" y1="40" x2="840" y2="40" stroke="#3fb950" stroke-width="3"/>
+
+        <!-- DEVELOP line -->
+        <line x1="120" y1="100" x2="760" y2="100" stroke="#58a6ff" stroke-width="3"/>
+
+        <!-- develop branches off main -->
+        <line x1="120" y1="40" x2="120" y2="100" stroke="#58a6ff" stroke-width="2" stroke-dasharray="4,3"/>
+
+        <!-- FEATURE branches -->
+        <line x1="200" y1="100" x2="200" y2="160" stroke="#bc8cff" stroke-width="2" stroke-dasharray="4,3"/>
+        <line x1="200" y1="160" x2="380" y2="160" stroke="#bc8cff" stroke-width="2.5"/>
+        <line x1="380" y1="160" x2="380" y2="100" stroke="#bc8cff" stroke-width="2" stroke-dasharray="4,3"/>
+
+        <line x1="260" y1="100" x2="260" y2="160" stroke="#bc8cff" stroke-width="2" stroke-dasharray="4,3"/>
+        <line x1="260" y1="160" x2="450" y2="160" stroke="#bc8cff" stroke-width="2.5" stroke-dasharray="6,0"/>
+        <line x1="450" y1="160" x2="450" y2="100" stroke="#bc8cff" stroke-width="2" stroke-dasharray="4,3"/>
+
+        <!-- RELEASE branch -->
+        <line x1="520" y1="100" x2="520" y2="220" stroke="#e3b341" stroke-width="2" stroke-dasharray="4,3"/>
+        <line x1="520" y1="220" x2="680" y2="220" stroke="#e3b341" stroke-width="2.5"/>
+        <line x1="680" y1="220" x2="680" y2="100" stroke="#e3b341" stroke-width="2" stroke-dasharray="4,3"/>
+        <!-- release merges to main -->
+        <line x1="680" y1="100" x2="720" y2="40"  stroke="#e3b341" stroke-width="2" stroke-dasharray="4,3"/>
+
+        <!-- HOTFIX branch -->
+        <line x1="760" y1="40"  x2="760" y2="280" stroke="#f78166" stroke-width="2" stroke-dasharray="4,3"/>
+        <line x1="760" y1="280" x2="840" y2="280" stroke="#f78166" stroke-width="2.5"/>
+        <line x1="840" y1="280" x2="840" y2="40"  stroke="#f78166" stroke-width="2" stroke-dasharray="4,3"/>
+        <!-- hotfix back to develop -->
+        <line x1="840" y1="40"  x2="840" y2="100" stroke="#f78166" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+
+        <!-- Commit dots – main -->
+        <circle cx="80"  cy="40" r="6" fill="#3fb950"/>
+        <circle cx="120" cy="40" r="5" fill="#3fb950" opacity="0.5"/>
+        <circle cx="720" cy="40" r="6" fill="#e3b341" stroke="#3fb950" stroke-width="2"/>
+        <circle cx="840" cy="40" r="6" fill="#f78166" stroke="#3fb950" stroke-width="2"/>
+
+        <!-- Commit dots – develop -->
+        <circle cx="120" cy="100" r="5" fill="#58a6ff"/>
+        <circle cx="200" cy="100" r="5" fill="#58a6ff"/>
+        <circle cx="260" cy="100" r="5" fill="#58a6ff"/>
+        <circle cx="380" cy="100" r="5" fill="#bc8cff" stroke="#58a6ff" stroke-width="2"/>
+        <circle cx="450" cy="100" r="5" fill="#bc8cff" stroke="#58a6ff" stroke-width="2"/>
+        <circle cx="520" cy="100" r="5" fill="#58a6ff"/>
+        <circle cx="680" cy="100" r="5" fill="#e3b341" stroke="#58a6ff" stroke-width="2"/>
+        <circle cx="760" cy="100" r="5" fill="#58a6ff"/>
+        <circle cx="840" cy="100" r="5" fill="#f78166" stroke="#58a6ff" stroke-width="2"/>
+
+        <!-- feature dots -->
+        <circle cx="200" cy="160" r="5" fill="#bc8cff"/>
+        <circle cx="290" cy="160" r="4" fill="#bc8cff" opacity="0.7"/>
+        <circle cx="380" cy="160" r="5" fill="#bc8cff"/>
+        <circle cx="260" cy="160" r="5" fill="#bc8cff"/>
+        <circle cx="355" cy="160" r="4" fill="#bc8cff" opacity="0.7"/>
+        <circle cx="450" cy="160" r="5" fill="#bc8cff"/>
+
+        <!-- release dots -->
+        <circle cx="520" cy="220" r="5" fill="#e3b341"/>
+        <circle cx="600" cy="220" r="4" fill="#e3b341" opacity="0.7"/>
+        <circle cx="680" cy="220" r="5" fill="#e3b341"/>
+
+        <!-- hotfix dots -->
+        <circle cx="760" cy="280" r="5" fill="#f78166"/>
+        <circle cx="800" cy="280" r="4" fill="#f78166" opacity="0.7"/>
+        <circle cx="840" cy="280" r="5" fill="#f78166"/>
+
+        <!-- Labels on diagram -->
+        <text x="290" y="152" fill="#bc8cff" font-size="10">feature/login</text>
+        <text x="320" y="178" fill="#bc8cff" font-size="10">feature/dashboard</text>
+        <text x="570" y="212" fill="#e3b341" font-size="10">release/1.0</text>
+        <text x="783" y="272" fill="#f78166" font-size="10">hotfix/1.0.1</text>
+        <text x="86"  y="32"  fill="#3fb950" font-size="10">v0.1</text>
+        <text x="726" y="32"  fill="#e3b341" font-size="10">v1.0</text>
+        <text x="844" y="32"  fill="#f78166" font-size="10">v1.0.1</text>
+
+        <!-- merge arrows (triangles) -->
+        <polygon points="380,97 376,105 384,105" fill="#bc8cff"/>
+        <polygon points="450,97 446,105 454,105" fill="#bc8cff"/>
+        <polygon points="680,97 676,105 684,105" fill="#e3b341"/>
+        <polygon points="840,97 836,105 844,105" fill="#f78166"/>
+      </svg>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px;">
+      <span class="pill"><span class="dot" style="background:var(--green)"></span>main — production</span>
+      <span class="pill"><span class="dot" style="background:var(--blue)"></span>develop — integration</span>
+      <span class="pill"><span class="dot" style="background:var(--purple)"></span>feature/*</span>
+      <span class="pill"><span class="dot" style="background:var(--yellow)"></span>release/*</span>
+      <span class="pill"><span class="dot" style="background:var(--accent)"></span>hotfix/*</span>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 4 · Core Branches                                         -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s4">
+    <h2>Core Branches</h2>
+    <div class="spacer-sm"></div>
+    <div class="cols" style="max-width:860px;">
+      <div class="card col" style="border-left: 3px solid var(--green);">
+        <span class="tag" style="background:#0d2818;color:var(--green);border:1px solid #1a4a28;">main</span>
+        <h3>Production branch</h3>
+        <div class="spacer-sm"></div>
+        <ul class="card-list">
+          <li><span class="icon">🔒</span>Always reflects a <strong>production-ready</strong> state</li>
+          <li><span class="icon">🏷️</span>Every commit on main is <strong>tagged</strong> with a version number</li>
+          <li><span class="icon">🚫</span>Direct commits are <strong>never</strong> made here</li>
+          <li><span class="icon">⬅️</span>Only receives merges from <strong>release</strong> or <strong>hotfix</strong></li>
+        </ul>
+      </div>
+      <div class="card col" style="border-left: 3px solid var(--blue);">
+        <span class="tag" style="background:#0d1f38;color:var(--blue);border:1px solid #1a3a5c;">develop</span>
+        <h3>Integration branch</h3>
+        <div class="spacer-sm"></div>
+        <ul class="card-list">
+          <li><span class="icon">🔀</span>Central hub where features are <strong>integrated</strong></li>
+          <li><span class="icon">🧪</span>Contains the <strong>latest delivered</strong> development changes</li>
+          <li><span class="icon">🌱</span>All feature branches are cut <strong>from</strong> develop</li>
+          <li><span class="icon">✅</span>When stable, it is merged into a <strong>release</strong> branch</li>
+        </ul>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <pre><span class="cmd-comment"># initialise a repo with Git Flow</span>
+<span class="cmd-key">git flow</span> init
+<span class="cmd-comment"># or manually:</span>
+<span class="cmd-key">git checkout</span> <span class="cmd-flag">-b</span> <span class="cmd-branch">develop</span> main</pre>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 5 · Feature Branches                                      -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s5">
+    <h2><span class="purple">Feature</span> Branches</h2>
+    <div class="spacer-sm"></div>
+    <p>Used to develop new features for an upcoming release. Feature branches exist only as long as the feature is in development.</p>
+    <div class="spacer"></div>
+    <div class="cols" style="max-width:900px;align-items:flex-start;">
+      <div class="col">
+        <div class="card" style="border-left:3px solid var(--purple);">
+          <h3 class="purple">Rules</h3>
+          <div class="spacer-sm"></div>
+          <ul class="card-list">
+            <li><span class="icon">🌿</span>Branch off from: <strong>develop</strong></li>
+            <li><span class="icon">🔁</span>Merge back into: <strong>develop</strong></li>
+            <li><span class="icon">📛</span>Naming: <code style="color:var(--purple)">feature/&lt;name&gt;</code></li>
+            <li><span class="icon">🤝</span>Use pull requests for code review before merge</li>
+            <li><span class="icon">🗑️</span>Delete after merging</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <pre><span class="cmd-comment"># — git-flow CLI —</span>
+<span class="cmd-key">git flow feature</span> start <span class="cmd-branch">user-auth</span>
+<span class="cmd-comment"># ... do your work ...</span>
+<span class="cmd-key">git flow feature</span> finish <span class="cmd-branch">user-auth</span>
+
+<span class="cmd-comment"># — manual —</span>
+<span class="cmd-key">git checkout</span> <span class="cmd-flag">-b</span> <span class="cmd-branch">feature/user-auth</span> develop
+<span class="cmd-comment"># ... commits ...</span>
+<span class="cmd-key">git checkout</span> develop
+<span class="cmd-key">git merge</span> <span class="cmd-flag">--no-ff</span> <span class="cmd-branch">feature/user-auth</span>
+<span class="cmd-key">git branch</span> <span class="cmd-flag">-d</span> <span class="cmd-branch">feature/user-auth</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 6 · Release Branches                                      -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s6">
+    <h2><span class="yellow">Release</span> Branches</h2>
+    <div class="spacer-sm"></div>
+    <p>Supports preparation of a new production release. Only <em>release-oriented</em> tasks go here — bug fixes, documentation, version bumping. No new features.</p>
+    <div class="spacer"></div>
+    <div class="cols" style="max-width:900px;align-items:flex-start;">
+      <div class="col">
+        <div class="card" style="border-left:3px solid var(--yellow);">
+          <h3 class="yellow">Rules</h3>
+          <div class="spacer-sm"></div>
+          <ul class="card-list">
+            <li><span class="icon">🌿</span>Branch off from: <strong>develop</strong></li>
+            <li><span class="icon">🔁</span>Merge into: <strong>main</strong> AND <strong>develop</strong></li>
+            <li><span class="icon">📛</span>Naming: <code style="color:var(--yellow)">release/&lt;version&gt;</code></li>
+            <li><span class="icon">🏷️</span>Tag the commit on <strong>main</strong> with the version</li>
+            <li><span class="icon">✅</span>Allows final QA and bug-fixing in isolation</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <pre><span class="cmd-comment"># — git-flow CLI —</span>
+<span class="cmd-key">git flow release</span> start <span class="cmd-val">1.0.0</span>
+<span class="cmd-comment"># bump version, fix release bugs ...</span>
+<span class="cmd-key">git flow release</span> finish <span class="cmd-val">1.0.0</span>
+
+<span class="cmd-comment"># — manual —</span>
+<span class="cmd-key">git checkout</span> <span class="cmd-flag">-b</span> <span class="cmd-branch">release/1.0.0</span> develop
+<span class="cmd-comment"># ... version bump, minor fixes ...</span>
+<span class="cmd-key">git checkout</span> main
+<span class="cmd-key">git merge</span> <span class="cmd-flag">--no-ff</span> <span class="cmd-branch">release/1.0.0</span>
+<span class="cmd-key">git tag</span> <span class="cmd-flag">-a</span> <span class="cmd-val">v1.0.0</span>
+<span class="cmd-key">git checkout</span> develop
+<span class="cmd-key">git merge</span> <span class="cmd-flag">--no-ff</span> <span class="cmd-branch">release/1.0.0</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 7 · Hotfix Branches                                       -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s7">
+    <h2><span class="accent">Hotfix</span> Branches</h2>
+    <div class="spacer-sm"></div>
+    <p>Used to quickly patch production bugs. The only branch that cuts directly from <strong>main</strong>, so a fix can be deployed without waiting for the next release cycle.</p>
+    <div class="spacer"></div>
+    <div class="cols" style="max-width:900px;align-items:flex-start;">
+      <div class="col">
+        <div class="card" style="border-left:3px solid var(--accent);">
+          <h3 class="accent">Rules</h3>
+          <div class="spacer-sm"></div>
+          <ul class="card-list">
+            <li><span class="icon">🌿</span>Branch off from: <strong>main</strong></li>
+            <li><span class="icon">🔁</span>Merge into: <strong>main</strong> AND <strong>develop</strong></li>
+            <li><span class="icon">📛</span>Naming: <code style="color:var(--accent)">hotfix/&lt;version&gt;</code></li>
+            <li><span class="icon">🏷️</span>Bump the patch version &amp; tag on main</li>
+            <li><span class="icon">⚡</span>Unblocks the production team immediately</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col">
+        <pre><span class="cmd-comment"># — git-flow CLI —</span>
+<span class="cmd-key">git flow hotfix</span> start <span class="cmd-val">1.0.1</span>
+<span class="cmd-comment"># ... fix the bug ...</span>
+<span class="cmd-key">git flow hotfix</span> finish <span class="cmd-val">1.0.1</span>
+
+<span class="cmd-comment"># — manual —</span>
+<span class="cmd-key">git checkout</span> <span class="cmd-flag">-b</span> <span class="cmd-branch">hotfix/1.0.1</span> main
+<span class="cmd-comment"># ... fix ...</span>
+<span class="cmd-key">git checkout</span> main
+<span class="cmd-key">git merge</span> <span class="cmd-flag">--no-ff</span> <span class="cmd-branch">hotfix/1.0.1</span>
+<span class="cmd-key">git tag</span> <span class="cmd-flag">-a</span> <span class="cmd-val">v1.0.1</span>
+<span class="cmd-key">git checkout</span> develop
+<span class="cmd-key">git merge</span> <span class="cmd-flag">--no-ff</span> <span class="cmd-branch">hotfix/1.0.1</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 8 · Full Lifecycle Cheatsheet                             -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s8">
+    <h2>Lifecycle <span class="blue">Cheatsheet</span></h2>
+    <div class="spacer-sm"></div>
+    <div class="cols" style="max-width:920px;gap:14px;">
+      <div class="card col" style="padding:16px 18px;">
+        <span class="tag" style="background:#0d2818;color:var(--green);border:1px solid #1a4a28;font-size:0.7rem;">SETUP</span>
+        <pre style="margin-top:8px;font-size:0.82rem;"><span class="cmd-key">git flow</span> init
+<span class="cmd-comment"># follow the prompts</span></pre>
+      </div>
+      <div class="card col" style="padding:16px 18px;">
+        <span class="tag" style="background:#1a1033;color:var(--purple);border:1px solid #3a2060;font-size:0.7rem;">FEATURE</span>
+        <pre style="margin-top:8px;font-size:0.82rem;"><span class="cmd-key">git flow feature</span> start <span class="cmd-branch">name</span>
+<span class="cmd-key">git flow feature</span> finish <span class="cmd-branch">name</span>
+<span class="cmd-key">git flow feature</span> publish <span class="cmd-branch">name</span>
+<span class="cmd-key">git flow feature</span> pull origin <span class="cmd-branch">name</span></pre>
+      </div>
+      <div class="card col" style="padding:16px 18px;">
+        <span class="tag" style="background:#1a1500;color:var(--yellow);border:1px solid #4a3c00;font-size:0.7rem;">RELEASE</span>
+        <pre style="margin-top:8px;font-size:0.82rem;"><span class="cmd-key">git flow release</span> start <span class="cmd-val">1.0</span>
+<span class="cmd-key">git flow release</span> finish <span class="cmd-val">1.0</span>
+<span class="cmd-key">git push</span> origin <span class="cmd-flag">--tags</span></pre>
+      </div>
+      <div class="card col" style="padding:16px 18px;">
+        <span class="tag" style="background:#1a0a06;color:var(--accent);border:1px solid #4a2010;font-size:0.7rem;">HOTFIX</span>
+        <pre style="margin-top:8px;font-size:0.82rem;"><span class="cmd-key">git flow hotfix</span> start <span class="cmd-val">1.0.1</span>
+<span class="cmd-key">git flow hotfix</span> finish <span class="cmd-val">1.0.1</span>
+<span class="cmd-key">git push</span> origin <span class="cmd-flag">--tags</span></pre>
+      </div>
+    </div>
+    <div class="spacer-sm"></div>
+    <p style="font-size:0.85rem;">Install: <code style="color:var(--blue)">brew install git-flow-avh</code> &nbsp;|&nbsp; <code style="color:var(--blue)">apt install git-flow</code> &nbsp;|&nbsp; <code style="color:var(--blue)">choco install gitflow-avh</code></p>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 9 · Benefits & Trade-offs                                 -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s9">
+    <h2>Benefits &amp; <span class="muted">Trade-offs</span></h2>
+    <div class="spacer-sm"></div>
+    <div class="benefit-grid">
+      <div class="benefit-item" style="border-left:3px solid var(--green);">
+        <div class="icon">✅</div>
+        <h3>Clean history</h3>
+        <p>Merge commits with <code>--no-ff</code> preserve branch context in the log.</p>
+      </div>
+      <div class="benefit-item" style="border-left:3px solid var(--blue);">
+        <div class="icon">🛡️</div>
+        <h3>Production stability</h3>
+        <p>main is always releasable; hotfixes can ship without touching in-progress work.</p>
+      </div>
+      <div class="benefit-item" style="border-left:3px solid var(--purple);">
+        <div class="icon">👥</div>
+        <h3>Parallel development</h3>
+        <p>Multiple feature branches can coexist without blocking each other.</p>
+      </div>
+      <div class="benefit-item" style="border-left:3px solid var(--yellow);">
+        <div class="icon">📋</div>
+        <h3>Clear release pipeline</h3>
+        <p>Dedicated release branches give QA a stable target for final testing.</p>
+      </div>
+      <div class="benefit-item" style="border-left:3px solid var(--accent);">
+        <div class="icon">⚠️</div>
+        <h3>Can feel heavy</h3>
+        <p>Overkill for small teams or continuous-delivery products — consider GitHub Flow instead.</p>
+      </div>
+      <div class="benefit-item" style="border-left:3px solid var(--muted);">
+        <div class="icon">🔁</div>
+        <h3>Long-lived branches = merge conflicts</h3>
+        <p>The longer a feature branch lives, the more divergence accumulates — merge often.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <!-- SLIDE 10 · Summary                                              -->
+  <!-- ─────────────────────────────────────────────────────────────── -->
+  <section class="slide" id="s10">
+    <h2>Summary</h2>
+    <div class="spacer-sm"></div>
+    <div style="max-width:700px;text-align:left;">
+      <div class="card">
+        <ul class="card-list" style="font-size:1rem;">
+          <li><span class="icon">🟢</span><strong>main</strong> &nbsp;→&nbsp; always production-ready, tagged at each release</li>
+          <li><span class="icon">🔵</span><strong>develop</strong> &nbsp;→&nbsp; integration point for finished features</li>
+          <li><span class="icon">🟣</span><strong>feature/*</strong> &nbsp;→&nbsp; one branch per feature, off <em>develop</em></li>
+          <li><span class="icon">🟡</span><strong>release/*</strong> &nbsp;→&nbsp; freeze features, finalize &amp; tag, merge both ways</li>
+          <li><span class="icon">🔴</span><strong>hotfix/*</strong> &nbsp;→&nbsp; emergency fix off <em>main</em>, merge both ways</li>
+        </ul>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <p>Git Flow shines for <strong>versioned, scheduled releases</strong>.<br>
+    Pair it with pull requests and CI/CD for best results.</p>
+    <div class="spacer"></div>
+    <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+      <a href="https://nvie.com/posts/a-successful-git-branching-model/" target="_blank"
+         style="color:var(--blue);font-size:0.88rem;text-decoration:none;border-bottom:1px solid var(--border);">
+        📄 Original article by Vincent Driessen
+      </a>
+      <a href="https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow" target="_blank"
+         style="color:var(--blue);font-size:0.88rem;text-decoration:none;border-bottom:1px solid var(--border);">
+        📘 Atlassian Git Flow Guide
+      </a>
+      <a href="https://github.com/petervanderdoes/gitflow-avh" target="_blank"
+         style="color:var(--blue);font-size:0.88rem;text-decoration:none;border-bottom:1px solid var(--border);">
+        🛠️ git-flow-avh (CLI tool)
+      </a>
+    </div>
+  </section>
+
+</div><!-- /deck -->
+
+<!-- ── Navigation ─────────────────────────────────────────────────── -->
+<div id="nav">
+  <button id="btn-prev" disabled>← Prev</button>
+  <span id="counter">1 / 10</span>
+  <button id="btn-next">Next →</button>
+</div>
+
+<script>
+  const slides   = Array.from(document.querySelectorAll('.slide'));
+  const btnPrev  = document.getElementById('btn-prev');
+  const btnNext  = document.getElementById('btn-next');
+  const counter  = document.getElementById('counter');
+  const progress = document.getElementById('progress-bar');
+  const total    = slides.length;
+  let current    = 0;
+
+  function goTo(n) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(n, total - 1));
+    slides[current].classList.add('active');
+
+    counter.textContent  = `${current + 1} / ${total}`;
+    btnPrev.disabled     = current === 0;
+    btnNext.disabled     = current === total - 1;
+    progress.style.width = `${((current + 1) / total) * 100}%`;
+  }
+
+  btnPrev.addEventListener('click', () => goTo(current - 1));
+  btnNext.addEventListener('click', () => goTo(current + 1));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ')  goTo(current + 1);
+    if (e.key === 'ArrowLeft')                     goTo(current - 1);
+  });
+
+  // init progress bar
+  goTo(0);
+</script>
+
+</body>
+</html>
