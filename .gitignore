@@ -1,2 +1,1 @@
-# example/ has its own git repo — ignore it entirely from the root
-example/
+# example/ is a git submodule — tracked via .gitmodules
